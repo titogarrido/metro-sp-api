@@ -75,4 +75,4 @@ async def get_metro_status():
 
 if __name__ == "__main__":
     port = os.getenv("PORT") or 8080
-    uvicorn.run(app, host="127.0.0.1", port=int(port))
+    uvicorn.run(app, host="0.0.0.0", port=int(port))

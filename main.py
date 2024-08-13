@@ -4,17 +4,23 @@ from fastapi import FastAPI, HTTPException
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
+from loguru import logger
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = FastAPI()
 
 # this script was based on https://github.com/ale-jr/metro-sp-api
 
+API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
+
 # Define the mapping for statuses
 status_mapping = {
     "verde": "normal",
-    "amarelo": "reduced_speed",
-    "cinza": "closed",
-    "vermelho": "paralyzed",
+    "amarelo": "velocidade reduzida",
+    "cinza": "fechada",
+    "vermelho": "paralizada",
 }
 
 @app.get("/")
@@ -72,6 +78,48 @@ async def get_metro_status():
         "last_update": update_time,
         "metro_status": lines_status
     }
+
+
+@app.get("/traffic-status")
+async def get_traffic_status():
+    origin = "Rua Estero Belaco 285, Saude, São Paulo, SP"
+    destination = "Av. Imperatriz Leopoldina, 500 - Vila Leopoldina, São Paulo, SP"
+    url = (
+        f"https://maps.googleapis.com/maps/api/directions/json"
+        f"?origin={origin.replace(' ', '+')}"
+        f"&destination={destination.replace(' ', '+')}"
+        f"&key={API_KEY}"
+        f"&departure_time=now"
+        f"&alternatives=true"
+    )
+
+    logger.debug(url)
+    
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching traffic data: {e}")
+
+    data = response.json()
+    
+    if data['status'] != 'OK':
+        raise HTTPException(status_code=404, detail="Could not fetch traffic data")
+
+    routes = []
+    for route in data['routes']:
+        leg = route['legs'][0]
+        traffic_info = {
+            "route_summary": route.get('summary', "No summary available"),
+            "origin": leg['start_address'],
+            "destination": leg['end_address'],
+            "distance": leg['distance']['text'],
+            "duration_without_traffic": leg['duration']['text'],
+            "duration_in_traffic": leg.get('duration_in_traffic', {}).get('text', "No traffic data available"),
+        }
+        routes.append(traffic_info)
+
+    return {"routes": routes}
 
 if __name__ == "__main__":
     port = os.getenv("PORT") or 8080

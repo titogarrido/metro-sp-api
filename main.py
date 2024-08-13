@@ -1,6 +1,6 @@
 import os
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
@@ -28,7 +28,7 @@ async def index():
     return {'status': 'ok'}
 
 @app.get("/metro-status")
-async def get_metro_status():
+async def get_metro_status(linhas: str = Query(None, description="Lista de linhas para filtrar, separadas por vírgula")):
     url = "https://www.viamobilidade.com.br/"
     try:
         response = requests.get(url)
@@ -50,6 +50,9 @@ async def get_metro_status():
     except ValueError:
         raise HTTPException(status_code=500, detail="Failed to parse update time")
 
+    # Convert the 'linhas' query parameter into a list of strings, if provided
+    linhas_filtrar = [linha.strip().lower() for linha in linhas.split(",")] if linhas else None
+
     # Extract the status of each metro line
     lines_status = []
     lines = soup.select("ol.row li")
@@ -67,6 +70,10 @@ async def get_metro_status():
         # Map the status color to the standardized status
         standardized_status = status_mapping.get(status_color.lower(), "unknown")
 
+        # Filtrar as linhas, se a lista de linhas a filtrar foi fornecida
+        if linhas_filtrar and line_name.strip().lower() not in linhas_filtrar:
+            continue
+
         lines_status.append({
             "linha": line_name,
             "status": standardized_status,
@@ -78,7 +85,6 @@ async def get_metro_status():
         "last_update": update_time,
         "metro_status": lines_status
     }
-
 
 @app.get("/traffic-status")
 async def get_traffic_status():

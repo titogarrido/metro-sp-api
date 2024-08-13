@@ -17,6 +17,10 @@ status_mapping = {
     "vermelho": "paralyzed",
 }
 
+@app.get("/")
+async def index():
+    return {'status': 'ok'}
+
 @app.get("/metro-status")
 async def get_metro_status():
     url = "https://www.viamobilidade.com.br/"

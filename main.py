@@ -18,7 +18,7 @@ API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
 # Define the mapping for statuses
 status_mapping = {
     "verde": "normal",
-    "amarelo": "velocidade reduzida",
+    "amarelo": "velocidade_reduzida",
     "cinza": "fechada",
     "vermelho": "paralizada",
 }

@@ -14,6 +14,13 @@ app = FastAPI()
 # this script was based on https://github.com/ale-jr/metro-sp-api
 
 API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
+WEATHER_API_KEY = os.getenv("OPENWEATHERMAP_API_KEY")
+
+# Coordenadas para São Paulo
+LAT = -23.6164531
+LON = -46.6352684
+
+logger.debug(f"Using OpenWeatherMap API Key: {WEATHER_API_KEY}")
 
 # Define the mapping for statuses
 status_mapping = {
@@ -126,6 +133,51 @@ async def get_traffic_status():
         routes.append(traffic_info)
 
     return {"routes": routes}
+
+@app.get("/weather")
+async def get_weather(city: str = "São Paulo", state: str = "SP", country: str = "BR"):
+    url = (
+        f"https://api.openweathermap.org/data/2.5/weather"
+        f"?q={city},{state},{country}"
+        f"&appid={WEATHER_API_KEY}"
+        f"&units=metric"  # Converte para Celsius
+        f"&lang=pt_br"    # Tradução para Português
+    )
+
+    logger.debug(f"Requesting weather data from: {url}")
+
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching weather data: {e}")
+
+    data = response.json()
+
+    if data['cod'] != 200:
+        raise HTTPException(status_code=404, detail="Could not fetch weather data")
+
+    # Convert timestamps to human-readable format
+    sunrise_time = datetime.fromtimestamp(data["sys"]["sunrise"]).strftime('%H:%M:%S')
+    sunset_time = datetime.fromtimestamp(data["sys"]["sunset"]).strftime('%H:%M:%S')
+
+    weather_info = {
+        "city": data["name"],
+        "temperature": data["main"]["temp"],
+        "feels_like": data["main"]["feels_like"],
+        "temp_min": data["main"]["temp_min"],
+        "temp_max": data["main"]["temp_max"],
+        "description": data["weather"][0]["description"],
+        "icon": f"http://openweathermap.org/img/wn/{data['weather'][0]['icon']}@2x.png",  # URL do ícone
+        "humidity": data["main"]["humidity"],
+        "pressure": data["main"]["pressure"],
+        "wind_speed": data["wind"]["speed"],
+        "sunrise": sunrise_time,
+        "sunset": sunset_time,
+    }
+
+    return {"weather": weather_info}
+
 
 if __name__ == "__main__":
     port = os.getenv("PORT") or 8080
